@@ -1,0 +1,162 @@
+#include <TinyGPS++.h>
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+#include <EEPROM.h>
+/*
+   This sample code demonstrates the normal use of a TinyGPS++ (TinyGPSPlus) object.
+   It requires the use of SoftwareSerial, and assumes that you have a
+   4800-baud serial GPS device hooked up on pins 9(rx) and 8(tx).
+*/
+static const int RXPin = 9, TXPin = 8;
+static const uint32_t GPSBaud = 9600;
+
+// The TinyGPS++ object
+TinyGPSPlus gps;
+
+// The serial connection to the GPS device
+SoftwareSerial ss(RXPin, TXPin);
+
+boolean usingInterrupt = false;
+void useInterrupt(boolean);
+
+// initialize the library with the numbers of the interface pins
+// RS pin connected to D3
+// V0 pin connected to D2
+// R/W pin connected to D4
+// Enable pin connected to D5
+// LCD DB4 connected to D11
+// 
+LiquidCrystal lcd(3, 5, 11, 10, 11, 12);
+ 
+int gpsWasFixed = HIGH;                                                  // did the GPS have a fix?
+int ledFix = 13;                                                          // pin for fix LED
+int servoPin = 9;                                                        // pin for servo
+int servoLock = 110;                                                     // angle (deg) of "locked" servo
+int servoUnlock = 0;                                                     // angle (deg) of "unlocked" servo
+
+static const double DESTINATION_LAT = 37.865271, DESTINATION_LON = -119.537753;
+
+//For writing to the EEPROM
+int addr = 0;
+int attempt = 0;
+void setup()
+{
+  digitalWrite(13, LOW);
+  pinMode(13, OUTPUT);
+  Serial.begin(115200);
+  ss.begin(GPSBaud);
+  //initialize digital pin 13 as an output.
+  EEPROM.write(addr, 1);
+  attempt = EEPROM.read(addr);
+  //attempt++;
+}
+
+void loop()
+{
+  Serial.print("Attempt ");
+  Serial.println(attempt);
+  digitalWrite(10, LOW);
+  while (ss.available() > 0) {
+    gps.encode(ss.read());
+    Serial.println("getting info ");
+  }
+  if (gps.location.isUpdated()) {
+    Serial.println(gps.location.lat(), 6);
+    //blinky(attempt);
+    //delay(1000);
+    if (attempt <= 10) {
+      Serial.print("attempt number ");
+      Serial.println(attempt);
+      unsigned long distanceMiToDestination =
+         (unsigned long)TinyGPSPlus::distanceBetween(
+         gps.location.lat(),
+         gps.location.lng(),
+         DESTINATION_LAT, 
+         DESTINATION_LON) / 1000 * 0.621371;
+      printInt(distanceMiToDestination, gps.location.isValid(), 9);
+      Serial.println();
+      EEPROM.write(addr, attempt);
+      smartDelay(1000);
+      pinMode(10, OUTPUT);
+      digitalWrite(10, HIGH);
+    }
+     //while (1); 
+  }
+  if (timeout = 1) {
+    digitalWrite(10, LOW);
+    Serial.println("You've reached the end ");
+    digitalWrite(13, HIGH);
+    //delay(100000);
+    while (1);
+  } 
+  if (timeout = 1) {
+    Serial.println("Timer for GPS timed out ");
+  }
+  }
+  return;
+}
+
+// This custom version of delay() ensures that the gps object
+// is being "fed".
+static void smartDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do 
+  {
+    while (ss.available())
+      gps.encode(ss.read());
+  } while (millis() - start < ms);
+}
+
+static void printFloat(float val, bool valid, int len, int prec)
+{
+  if (!valid)
+  {
+    while (len-- > 1)
+      Serial.print('*');
+    Serial.print(' ');
+  }
+  else
+  {
+    Serial.print(val, prec);
+    int vi = abs((int)val);
+    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
+    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
+    for (int i=flen; i<len; ++i)
+      Serial.print(' ');
+      
+  }
+  smartDelay(0);
+}
+
+static void printInt(unsigned long val, bool valid, int len)
+{
+  char sz[32] = "*****************";
+  if (valid)
+    sprintf(sz, "%ld", val);
+  sz[len] = 0;
+  for (int i=strlen(sz); i<len; ++i)
+    sz[i] = ' ';
+  if (len > 0) 
+    sz[len-1] = ' ';
+  Serial.print(sz);
+  smartDelay(0);
+}
+
+static void printStr(const char *str, int len)
+{
+  int slen = strlen(str);
+  for (int i=0; i<len; ++i)
+    Serial.print(i<slen ? str[i] : ' ');
+  smartDelay(0);
+}
+
+void blinky(int blinks)
+{
+  for (int j=0; j < blinks; ++j) {
+    digitalWrite(13, HIGH);
+    delay(200);
+    digitalWrite(13, LOW);
+    delay(200);
+  }
+}
